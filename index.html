@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cloud Reader | AppADay 131</title>
+<meta name="description" content="Point your camera at the sky. Cloud Reader identifies the cloud deck overhead and calls the next few hours like a weather anchor.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<style>
+:root{
+  --sky-top:#1b3a63;
+  --sky-mid:#2f5d8c;
+  --sky-bot:#6f93b5;
+  --tally:#ff3b30;
+  --band:#0a1018;
+  --band-soft:rgba(10,16,24,0.86);
+  --rule:#f2b705;
+  --ink:#f4f7fb;
+  --ink-dim:#aebdd0;
+  --cloud:#8fd3ff;
+  --rain:#4f7dff;
+  --temp:#f2b705;
+}
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0;
+  min-height:100dvh;
+  display:flex;
+  flex-direction:column;
+  font-family:'Spectral',Georgia,serif;
+  color:var(--ink);
+  background:linear-gradient(180deg,var(--sky-top) 0%,var(--sky-mid) 46%,var(--sky-bot) 100%);
+  background-attachment:fixed;
+}
+body::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(120% 60% at 50% 0%,rgba(255,255,255,0.14),rgba(255,255,255,0) 60%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,0.03) 0 1px,rgba(255,255,255,0) 1px 4px);
+  pointer-events:none;
+}
+a{color:inherit;}
+.shell{
+  position:relative;
+  width:100%;
+  max-width:46rem;
+  margin:0 auto;
+  padding:0 1rem 2.5rem;
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+  gap:1.5rem;
+}
+header.deck{
+  display:flex;
+  align-items:center;
+  gap:0.75rem;
+  flex-wrap:wrap;
+  padding:1rem 0 0.75rem;
+  border-bottom:2px solid rgba(242,183,5,0.55);
+}
+.wordmark{
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-weight:700;
+  font-size:clamp(1.9rem,7vw,3rem);
+  letter-spacing:0.01em;
+  line-height:0.92;
+  margin:0;
+  text-shadow:0 0.12rem 0 rgba(0,0,0,0.35);
+}
+.wordmark span{display:block;font-size:0.36em;font-weight:500;letter-spacing:0.34em;color:var(--rule);}
+.tally{
+  display:flex;
+  align-items:center;
+  gap:0.45rem;
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-weight:600;
+  font-size:0.95rem;
+  letter-spacing:0.18em;
+  color:var(--ink-dim);
+  margin-left:auto;
+}
+.tally i{
+  width:0.7rem;height:0.7rem;border-radius:50%;
+  background:#4a5568;display:block;
+}
+.tally.live{color:#ffd9d6;}
+.tally.live i{background:var(--tally);animation:pulse 1.1s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(255,59,48,0.6);}50%{opacity:0.55;box-shadow:0 0 0 0.55rem rgba(255,59,48,0);}}
+.deck-links{display:flex;gap:0.5rem;}
+.icon-btn{
+  min-width:44px;min-height:44px;
+  display:inline-flex;align-items:center;justify-content:center;
+  gap:0.35rem;
+  padding:0 0.7rem;
+  border:1px solid rgba(244,247,251,0.35);
+  background:rgba(10,16,24,0.5);
+  color:var(--ink);
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-size:1rem;letter-spacing:0.12em;font-weight:600;
+  text-decoration:none;cursor:pointer;
+  transition:background 0.18s ease,border-color 0.18s ease;
+}
+.icon-btn:hover,.icon-btn:focus-visible{background:rgba(242,183,5,0.2);border-color:var(--rule);}
+:focus-visible{outline:3px solid var(--rule);outline-offset:2px;}
+section.segment{display:flex;flex-direction:column;gap:0.85rem;}
+.slate{
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-weight:600;
+  font-size:clamp(1.15rem,4vw,1.5rem);
+  letter-spacing:0.22em;
+  margin:0;
+  color:var(--rule);
+}
+.slate small{display:block;letter-spacing:0.04em;font-size:0.62em;color:var(--ink-dim);font-weight:500;}
+.capture{
+  position:relative;
+  display:flex;align-items:center;justify-content:center;gap:0.6rem;
+  min-height:clamp(5rem,18vw,7rem);
+  width:100%;
+  border:2px dashed rgba(244,247,251,0.45);
+  background:rgba(10,16,24,0.42);
+  cursor:pointer;
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-size:clamp(1.15rem,4.6vw,1.6rem);
+  font-weight:600;letter-spacing:0.1em;
+  text-align:center;padding:1rem;
+  transition:border-color 0.18s ease,background 0.18s ease;
+}
+.capture:hover,.capture:focus-within{border-color:var(--rule);background:rgba(242,183,5,0.12);}
+.capture input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+.frame{display:none;border:1px solid rgba(244,247,251,0.3);background:rgba(10,16,24,0.5);padding:0.4rem;}
+.frame.on{display:block;}
+.frame img{display:block;width:100%;height:auto;}
+.bumper{display:none;padding:1rem 0;}
+.bumper.on{display:block;}
+.bumper .bars{display:flex;gap:0.35rem;align-items:flex-end;height:2.2rem;}
+.bumper .bars b{
+  flex:1 1 auto;background:linear-gradient(180deg,var(--rule),rgba(242,183,5,0.2));
+  transform-origin:bottom;animation:sweep 1s ease-in-out infinite;
+}
+.bumper .bars b:nth-child(2){animation-delay:0.12s;}
+.bumper .bars b:nth-child(3){animation-delay:0.24s;}
+.bumper .bars b:nth-child(4){animation-delay:0.36s;}
+.bumper .bars b:nth-child(5){animation-delay:0.48s;}
+.bumper .bars b:nth-child(6){animation-delay:0.6s;}
+@keyframes sweep{0%,100%{transform:scaleY(0.25);}50%{transform:scaleY(1);}}
+.bumper p{
+  margin:0.6rem 0 0;font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  letter-spacing:0.2em;font-size:1rem;color:var(--ink-dim);
+}
+.lower-third{
+  display:none;
+  background:var(--band-soft);
+  border-left:0.5rem solid var(--rule);
+  box-shadow:0 0.75rem 1.5rem rgba(4,8,14,0.4);
+}
+.lower-third.on{display:block;}
+.lower-third .lt-top{
+  padding:0.85rem 1rem 0.55rem;
+}
+.lower-third .kicker{
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-weight:600;font-size:0.95rem;letter-spacing:0.26em;
+  color:var(--rule);margin:0 0 0.2rem;
+}
+.lower-third h3{
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-weight:700;font-size:clamp(1.6rem,6.4vw,2.4rem);
+  line-height:1;margin:0;letter-spacing:0.01em;
+}
+.lower-third .latin{
+  font-style:italic;color:var(--ink-dim);font-size:0.95rem;margin:0.3rem 0 0;
+}
+.lower-third .lt-body{
+  padding:0.7rem 1rem 1rem;
+  border-top:1px solid rgba(244,247,251,0.14);
+  background:rgba(4,8,14,0.45);
+}
+.lower-third p.read{
+  margin:0 0 0.7rem;font-size:clamp(1rem,3.6vw,1.1rem);line-height:1.62;max-width:64ch;
+}
+.lower-third p.read:last-child{margin-bottom:0;}
+.lower-third .confidence{
+  display:inline-block;margin-top:0.45rem;padding:0.15rem 0.5rem;
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  letter-spacing:0.18em;font-size:0.85rem;
+  border:1px solid rgba(242,183,5,0.6);color:var(--rule);
+}
+.lower-third.fault{border-left-color:var(--tally);}
+.lower-third.fault .kicker{color:#ffb3ae;}
+.strip{
+  display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;
+  background:rgba(10,16,24,0.55);
+  border:1px solid rgba(244,247,251,0.2);
+  padding:0.6rem 0.75rem;
+}
+.strip p{margin:0;font-size:0.98rem;color:var(--ink-dim);flex:1 1 12rem;}
+.chart-box{
+  position:relative;
+  width:100%;
+  aspect-ratio:16/10;
+  background:rgba(4,8,14,0.55);
+  border:1px solid rgba(244,247,251,0.18);
+  padding:0.5rem;
+}
+@media (min-width:36rem){.chart-box{aspect-ratio:2.4/1;}}
+.log{display:flex;flex-direction:column;gap:0.5rem;}
+.log-item{
+  display:flex;gap:0.75rem;align-items:baseline;
+  background:rgba(10,16,24,0.5);
+  border-left:0.25rem solid rgba(143,211,255,0.7);
+  padding:0.6rem 0.75rem;
+}
+.log-item time{
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  letter-spacing:0.12em;font-size:0.9rem;color:var(--ink-dim);flex:0 0 auto;
+}
+.log-item div{flex:1 1 auto;}
+.log-item strong{
+  display:block;font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-size:1.2rem;font-weight:700;letter-spacing:0.02em;
+}
+.log-item span{font-size:0.95rem;color:var(--ink-dim);line-height:1.5;}
+.log-empty{margin:0;color:var(--ink-dim);font-style:italic;}
+footer.signoff{
+  border-top:2px solid rgba(242,183,5,0.55);
+  padding:1rem 0 0;
+  display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  letter-spacing:0.14em;color:var(--ink-dim);
+}
+.overlay{
+  display:none;position:fixed;inset:0;z-index:20;
+  background:rgba(2,5,10,0.78);
+  padding:1rem;
+  align-items:flex-start;justify-content:center;
+  overflow-y:auto;
+}
+.overlay.on{display:flex;}
+.modal{
+  width:100%;max-width:28rem;margin-top:12vh;
+  background:var(--band);
+  border:1px solid rgba(242,183,5,0.5);
+  padding:1.25rem;
+}
+.modal h2{
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-size:1.7rem;letter-spacing:0.14em;margin:0 0 0.35rem;color:var(--rule);
+}
+.modal p{font-size:0.98rem;color:var(--ink-dim);line-height:1.6;margin:0 0 0.9rem;}
+.modal label{
+  display:block;font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  letter-spacing:0.16em;margin-bottom:0.3rem;
+}
+.modal input{
+  width:100%;min-height:44px;padding:0.6rem 0.7rem;
+  font-family:'Spectral',Georgia,serif;font-size:1rem;
+  background:rgba(244,247,251,0.08);
+  border:1px solid rgba(244,247,251,0.35);
+  color:var(--ink);
+}
+.modal-row{display:flex;gap:0.6rem;margin-top:1rem;}
+.modal-row button{flex:1 1 auto;}
+.btn-solid{
+  min-height:44px;padding:0 1rem;cursor:pointer;
+  background:var(--rule);color:#10151d;border:none;
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-size:1.05rem;font-weight:700;letter-spacing:0.14em;
+}
+.btn-solid:hover{background:#ffc927;}
+.btn-ghost{
+  min-height:44px;padding:0 1rem;cursor:pointer;
+  background:transparent;color:var(--ink);
+  border:1px solid rgba(244,247,251,0.4);
+  font-family:'Barlow Condensed',Arial Narrow,sans-serif;
+  font-size:1.05rem;font-weight:600;letter-spacing:0.14em;
+}
+.btn-ghost:hover{border-color:var(--rule);color:var(--rule);}
+@media (prefers-reduced-motion:reduce){
+  .tally.live i,.bumper .bars b{animation:none;}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="deck">
+    <h1 class="wordmark">Cloud Reader<span>App 131</span></h1>
+    <p class="tally" id="tally"><i></i>STANDBY</p>
+    <div class="deck-links">
+      <button class="icon-btn" id="gear" type="button" aria-label="Open settings">KEY</button>
+      <a class="icon-btn" href="https://augustineiacopelli.github.io/appaday/">AppADay</a>
+    </div>
+  </header>
+
+  <section class="segment" aria-labelledby="slate-now">
+    <h2 class="slate" id="slate-now">Nowcast<small>Shoot the sky, get the read</small></h2>
+
+    <label class="capture" for="shot">
+      Point at the sky and shoot
+      <input type="file" id="shot" accept="image/*" capture="environment">
+    </label>
+
+    <div class="frame" id="frame"><img id="thumb" alt="The sky photo you captured"></div>
+
+    <div class="bumper" id="bumper-now" role="status" aria-live="polite">
+      <div class="bars"><b></b><b></b><b></b><b></b><b></b><b></b></div>
+      <p>Reading the deck</p>
+    </div>
+
+    <div class="lower-third" id="now-panel"></div>
+  </section>
+
+  <section class="segment" aria-labelledby="slate-out">
+    <h2 class="slate" id="slate-out">Outlook<small>Next 48 hours where you stand</small></h2>
+
+    <div class="strip">
+      <p id="geo-status">Finding your location</p>
+      <button class="btn-ghost" id="retry" type="button">Locate me</button>
+    </div>
+
+    <div class="chart-box"><canvas id="trend" aria-label="Hourly cloud cover, rain chance, and temperature trend"></canvas></div>
+
+    <div class="bumper" id="bumper-out" role="status" aria-live="polite">
+      <div class="bars"><b></b><b></b><b></b><b></b><b></b><b></b></div>
+      <p>Writing the outlook</p>
+    </div>
+
+    <div class="lower-third" id="out-panel"></div>
+  </section>
+
+  <section class="segment" aria-labelledby="slate-log">
+    <h2 class="slate" id="slate-log">Rundown<small>Your last twenty sky checks</small></h2>
+    <div class="log" id="log"></div>
+    <button class="btn-ghost" id="clear-log" type="button">Clear the rundown</button>
+  </section>
+
+  <footer class="signoff">
+    <span>Built in a day</span>
+    <a class="icon-btn" href="https://augustineiacopelli.github.io/appaday/">Back to AppADay</a>
+  </footer>
+</div>
+
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal">
+    <h2 id="modal-title">Anthropic API key</h2>
+    <p>Cloud Reader calls Claude straight from this browser. Your key is stored only in this device's local storage and never leaves it except to reach Anthropic.</p>
+    <label for="key-input">Key</label>
+    <input type="password" id="key-input" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+    <div class="modal-row">
+      <button class="btn-solid" id="save-key" type="button">Save key</button>
+      <button class="btn-ghost" id="close-key" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var CLAUDE_MODEL = 'claude-sonnet-5';
+  var KEY_STORE = 'cloudreader-key';
+  var HISTORY_STORE = 'cloudreader-history';
+  var HISTORY_CAP = 20;
+  var PORTFOLIO_URL = 'https://augustineiacopelli.github.io/appaday/';
+  var API_URL = 'https://api.anthropic.com/v1/messages';
+  var METEO_URL = 'https://api.open-meteo.com/v1/forecast';
+
+  var NOWCAST_PROMPT = [
+    'You are an on-air television meteorologist doing a live sky check for a viewer photo.',
+    'Identify the cloud type or types visible in the image and read what they signal for the next one to three hours.',
+    'Reply with a single JSON object and nothing else. No markdown, no code fences, no preamble.',
+    'Keys: cloud (common name of the dominant cloud type, or two names joined by " over " if layered, under 40 characters),',
+    'latin (the Latin classification such as Cumulus humilis, or an empty string if the photo is too obscured),',
+    'confidence (exactly one of high, moderate, low),',
+    'signal (one or two sentences in a broadcast anchor voice on what happens in the next one to three hours),',
+    'detail (two or three sentences naming the visual cues you used and the atmospheric process behind them).',
+    'If the photo does not show sky, set cloud to No sky in frame, confidence to low, and say so plainly in signal.'
+  ].join(' ');
+
+  var OUTLOOK_PROMPT = [
+    'You are the same on-air television meteorologist, now at the forecast wall.',
+    'Using the hourly model data below, write a spoken outlook of three to five sentences covering roughly the next two days.',
+    'Cover the cloud cover trend, the rain chances, and the temperature swing, and land on one practical takeaway.',
+    'Plain prose only. No markdown, no lists, no headings, no labels, no stage directions.'
+  ].join(' ');
+
+  var IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+  var el = {};
+  var pendingImage = null;
+  var chart = null;
+  var latestHourly = null;
+
+  function $(id) { return document.getElementById(id); }
+
+  function loadKey() {
+    try {
+      return window.localStorage.getItem(KEY_STORE) || '';
+    } catch (err) {
+      return '';
+    }
+  }
+
+  function saveKey(value) {
+    try {
+      if (value) {
+        window.localStorage.setItem(KEY_STORE, value);
+      } else {
+        window.localStorage.removeItem(KEY_STORE);
+      }
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function loadHistory() {
+    try {
+      var raw = window.localStorage.getItem(HISTORY_STORE);
+      if (!raw) { return []; }
+      var parsed = JSON.parse(raw);
+      return Object.prototype.toString.call(parsed) === '[object Array]' ? parsed : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function saveHistory(list) {
+    try {
+      window.localStorage.setItem(HISTORY_STORE, JSON.stringify(list.slice(0, HISTORY_CAP)));
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function pushHistory(entry) {
+    try {
+      var list = loadHistory();
+      list.unshift(entry);
+      saveHistory(list);
+      renderHistory();
+    } catch (err) {
+      renderHistory();
+    }
+  }
+
+  function setSkyGradient() {
+    var hour = new Date().getHours();
+    var top = '#1b3a63';
+    var mid = '#2f5d8c';
+    var bot = '#6f93b5';
+    if (hour < 5 || hour >= 21) {
+      top = '#070c18'; mid = '#101c33'; bot = '#243a58';
+    } else if (hour < 8) {
+      top = '#1d2a52'; mid = '#4b4272'; bot = '#c07a63';
+    } else if (hour < 11) {
+      top = '#1d4d80'; mid = '#3f77aa'; bot = '#9dc2dd';
+    } else if (hour < 17) {
+      top = '#14538f'; mid = '#3b82c4'; bot = '#a8cbe4';
+    } else if (hour < 19) {
+      top = '#1a3a6b'; mid = '#6b5a8e'; bot = '#d9895c';
+    } else {
+      top = '#0d1730'; mid = '#27324f'; bot = '#5d5470';
+    }
+    var root = document.documentElement;
+    root.style.setProperty('--sky-top', top);
+    root.style.setProperty('--sky-mid', mid);
+    root.style.setProperty('--sky-bot', bot);
+  }
+
+  function setTally(live, label) {
+    el.tally.className = live ? 'tally live' : 'tally';
+    el.tally.textContent = '';
+    var dot = document.createElement('i');
+    el.tally.appendChild(dot);
+    el.tally.appendChild(document.createTextNode(label));
+  }
+
+  function openSettings() {
+    el.overlay.classList.add('on');
+    el.keyInput.value = loadKey();
+    window.setTimeout(function () { el.keyInput.focus(); }, 30);
+  }
+
+  function closeSettings() {
+    el.overlay.classList.remove('on');
+  }
+
+  function clearNode(node) {
+    while (node.firstChild) {
+      node.removeChild(node.firstChild);
+    }
+  }
+
+  function makeEl(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text) { node.textContent = text; }
+    return node;
+  }
+
+  function showError(panel, kicker, message) {
+    clearNode(panel);
+    panel.className = 'lower-third fault on';
+    var top = makeEl('div', 'lt-top');
+    top.appendChild(makeEl('p', 'kicker', kicker));
+    top.appendChild(makeEl('h3', null, 'Signal lost'));
+    var body = makeEl('div', 'lt-body');
+    body.appendChild(makeEl('p', 'read', message));
+    panel.appendChild(top);
+    panel.appendChild(body);
+  }
+
+  function renderPanel(panel, kicker, headline, latin, paragraphs, confidence) {
+    clearNode(panel);
+    panel.className = 'lower-third on';
+    var top = makeEl('div', 'lt-top');
+    top.appendChild(makeEl('p', 'kicker', kicker));
+    top.appendChild(makeEl('h3', null, headline));
+    if (latin) { top.appendChild(makeEl('p', 'latin', latin)); }
+    var body = makeEl('div', 'lt-body');
+    for (var i = 0; i < paragraphs.length; i += 1) {
+      if (paragraphs[i]) { body.appendChild(makeEl('p', 'read', paragraphs[i])); }
+    }
+    if (confidence) {
+      body.appendChild(makeEl('span', 'confidence', 'Confidence ' + confidence));
+    }
+    panel.appendChild(top);
+    panel.appendChild(body);
+  }
+
+  function setBumper(node, on) {
+    if (on) { node.classList.add('on'); } else { node.classList.remove('on'); }
+  }
+
+  function handleFileSelect(event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) { return; }
+    var mediaType = IMAGE_TYPES.indexOf(file.type) > -1 ? file.type : 'image/jpeg';
+    var reader = new FileReader();
+    reader.onload = function () {
+      var dataUrl = String(reader.result || '');
+      var comma = dataUrl.indexOf(',');
+      if (comma < 0) {
+        showError(el.nowPanel, 'Nowcast', 'That file did not read as an image. Try shooting the sky again.');
+        return;
+      }
+      pendingImage = { media: mediaType, data: dataUrl.slice(comma + 1) };
+      el.thumb.src = dataUrl;
+      el.frame.classList.add('on');
+      runNowcast();
+    };
+    reader.onerror = function () {
+      showError(el.nowPanel, 'Nowcast', 'The browser could not open that photo. Pick another shot and we will roll again.');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function callClaude(content, maxTokens) {
+    var key = loadKey();
+    if (!key) {
+      openSettings();
+      throw new Error('Add your Anthropic API key in the key panel, then shoot the sky again.');
+    }
+    var res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: maxTokens || 700,
+        messages: [{ role: 'user', content: content }]
+      })
+    });
+    if (!res.ok) {
+      var detail = '';
+      try { detail = await res.text(); } catch (err) { detail = ''; }
+      if (res.status === 401) {
+        throw new Error('Anthropic rejected that key. Open the key panel and paste a current one.');
+      }
+      throw new Error('Anthropic returned status ' + res.status + '. ' + String(detail).slice(0, 180));
+    }
+    var data = await res.json();
+    var blocks = data && data.content ? data.content : [];
+    var text = '';
+    for (var i = 0; i < blocks.length; i += 1) {
+      if (blocks[i] && blocks[i].type === 'text') { text += blocks[i].text; }
+    }
+    return text.trim();
+  }
+
+  function parseJsonish(text) {
+    var cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    var start = cleaned.indexOf('{');
+    var end = cleaned.lastIndexOf('}');
+    if (start < 0 || end <= start) { return null; }
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch (err) {
+      return null;
+    }
+  }
+
+  async function runNowcast() {
+    if (!pendingImage) { return; }
+    el.nowPanel.classList.remove('on');
+    setBumper(el.bumperNow, true);
+    setTally(true, 'ON AIR');
+    try {
+      var payload = [
+        { type: 'image', source: { type: 'base64', media_type: pendingImage.media, data: pendingImage.data } },
+        { type: 'text', text: NOWCAST_PROMPT }
+      ];
+      var text = await callClaude(payload, 700);
+      var read = parseJsonish(text);
+      if (!read || !read.cloud) {
+        renderPanel(el.nowPanel, 'Nowcast', 'Sky check', '', [text], '');
+        pushHistory({ ts: Date.now(), cloud: 'Sky check', signal: text.slice(0, 220) });
+      } else {
+        renderPanel(
+          el.nowPanel,
+          'Nowcast',
+          String(read.cloud),
+          read.latin ? String(read.latin) : '',
+          [read.signal ? String(read.signal) : '', read.detail ? String(read.detail) : ''],
+          read.confidence ? String(read.confidence) : ''
+        );
+        pushHistory({
+          ts: Date.now(),
+          cloud: String(read.cloud),
+          signal: read.signal ? String(read.signal) : ''
+        });
+      }
+    } catch (err) {
+      showError(el.nowPanel, 'Nowcast', err && err.message ? err.message : 'The call did not go through.');
+    } finally {
+      setBumper(el.bumperNow, false);
+      setTally(false, 'STANDBY');
+    }
+  }
+
+  function getPosition() {
+    return new Promise(function (resolve, reject) {
+      if (!navigator.geolocation) {
+        reject(new Error('This browser does not share location.'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        function (pos) { resolve(pos.coords); },
+        function (err) {
+          reject(new Error(err && err.code === 1
+            ? 'Location is blocked, so the outlook is parked. The Nowcast still works.'
+            : 'Location did not come back in time. Tap Locate me to try again.'));
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
+      );
+    });
+  }
+
+  async function fetchOpenMeteo(lat, lon) {
+    var url = METEO_URL
+      + '?latitude=' + encodeURIComponent(lat.toFixed(3))
+      + '&longitude=' + encodeURIComponent(lon.toFixed(3))
+      + '&hourly=temperature_2m,precipitation_probability,cloud_cover'
+      + '&forecast_hours=48&temperature_unit=fahrenheit&timezone=auto';
+    var res = await fetch(url);
+    if (!res.ok) {
+      throw new Error('Open-Meteo returned status ' + res.status + '.');
+    }
+    var data = await res.json();
+    if (!data || !data.hourly || !data.hourly.time) {
+      throw new Error('Open-Meteo sent no hourly data for that spot.');
+    }
+    return data.hourly;
+  }
+
+  function shortHour(iso) {
+    var d = new Date(iso);
+    var h = d.getHours();
+    var suffix = h >= 12 ? 'p' : 'a';
+    var display = h % 12;
+    if (display === 0) { display = 12; }
+    return display + suffix;
+  }
+
+  function buildTrendChart(hourly) {
+    if (typeof window.Chart === 'undefined') { return; }
+    var labels = hourly.time.map(shortHour);
+    if (chart) { chart.destroy(); chart = null; }
+    var grid = 'rgba(244,247,251,0.12)';
+    var ticks = { color: '#aebdd0', font: { family: 'Barlow Condensed, Arial Narrow, sans-serif', size: 12 } };
+    chart = new window.Chart(el.canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Cloud cover',
+            data: hourly.cloud_cover,
+            borderColor: '#8fd3ff',
+            backgroundColor: 'rgba(143,211,255,0.18)',
+            borderWidth: 2,
+            fill: true,
+            pointRadius: 0,
+            tension: 0.35,
+            yAxisID: 'pct'
+          },
+          {
+            label: 'Rain chance',
+            data: hourly.precipitation_probability,
+            borderColor: '#4f7dff',
+            borderWidth: 2,
+            borderDash: [5, 4],
+            fill: false,
+            pointRadius: 0,
+            tension: 0.3,
+            yAxisID: 'pct'
+          },
+          {
+            label: 'Temperature',
+            data: hourly.temperature_2m,
+            borderColor: '#f2b705',
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 0,
+            tension: 0.3,
+            yAxisID: 'deg'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: {
+              color: '#f4f7fb',
+              boxWidth: 14,
+              font: { family: 'Barlow Condensed, Arial Narrow, sans-serif', size: 13 }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(10,16,24,0.94)',
+            borderColor: 'rgba(242,183,5,0.6)',
+            borderWidth: 1,
+            titleColor: '#f2b705',
+            bodyColor: '#f4f7fb'
+          }
+        },
+        scales: {
+          x: { grid: { color: grid }, ticks: Object.assign({ maxTicksLimit: 8 }, ticks) },
+          pct: {
+            position: 'left',
+            min: 0,
+            max: 100,
+            grid: { color: grid },
+            ticks: Object.assign({ callback: function (v) { return v + '%'; } }, ticks)
+          },
+          deg: {
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            ticks: Object.assign({ callback: function (v) { return v + '\u00b0'; } }, ticks)
+          }
+        }
+      }
+    });
+  }
+
+  function condenseHourly(hourly, placeLabel) {
+    var lines = [];
+    for (var i = 0; i < hourly.time.length; i += 3) {
+      var t = new Date(hourly.time[i]);
+      var day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][t.getDay()];
+      lines.push(day + ' ' + shortHour(hourly.time[i])
+        + ': ' + Math.round(hourly.temperature_2m[i]) + 'F'
+        + ', cloud ' + Math.round(hourly.cloud_cover[i]) + '%'
+        + ', rain ' + Math.round(hourly.precipitation_probability[i]) + '%');
+    }
+    return 'Location: ' + placeLabel + '. Hourly model data, every third hour, temperatures in Fahrenheit:\n' + lines.join('\n');
+  }
+
+  async function runOutlook(hourly, placeLabel) {
+    el.outPanel.classList.remove('on');
+    setBumper(el.bumperOut, true);
+    setTally(true, 'ON AIR');
+    try {
+      var summary = condenseHourly(hourly, placeLabel);
+      var text = await callClaude([{ type: 'text', text: OUTLOOK_PROMPT + '\n\n' + summary }], 600);
+      var paras = text.split(/\n{2,}/).slice(0, 3);
+      renderPanel(el.outPanel, 'Outlook', 'At the wall', '', paras, '');
+    } catch (err) {
+      showError(el.outPanel, 'Outlook', err && err.message ? err.message : 'The outlook call did not go through.');
+    } finally {
+      setBumper(el.bumperOut, false);
+      setTally(false, 'STANDBY');
+    }
+  }
+
+  async function locateAndForecast() {
+    el.geoStatus.textContent = 'Finding your location';
+    el.retry.disabled = true;
+    try {
+      var coords = await getPosition();
+      var label = coords.latitude.toFixed(2) + ', ' + coords.longitude.toFixed(2);
+      el.geoStatus.textContent = 'Model data for ' + label;
+      var hourly = await fetchOpenMeteo(coords.latitude, coords.longitude);
+      latestHourly = hourly;
+      buildTrendChart(hourly);
+      if (loadKey()) {
+        await runOutlook(hourly, label);
+      } else {
+        renderPanel(el.outPanel, 'Outlook', 'Key needed', '', [
+          'The trend line is live. Add your Anthropic API key in the key panel and tap Locate me to hear the outlook read.'
+        ], '');
+      }
+    } catch (err) {
+      el.geoStatus.textContent = 'Location unavailable';
+      showError(el.outPanel, 'Outlook', err && err.message ? err.message : 'Location did not come back.');
+    } finally {
+      el.retry.disabled = false;
+    }
+  }
+
+  function renderHistory() {
+    var list = loadHistory();
+    clearNode(el.log);
+    if (!list.length) {
+      el.log.appendChild(makeEl('p', 'log-empty', 'Nothing in the rundown yet. Your sky checks land here.'));
+      el.clearLog.disabled = true;
+      return;
+    }
+    el.clearLog.disabled = false;
+    for (var i = 0; i < list.length; i += 1) {
+      var item = list[i];
+      var row = makeEl('div', 'log-item');
+      var when = document.createElement('time');
+      var d = new Date(item.ts);
+      when.dateTime = d.toISOString();
+      when.textContent = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + shortHour(d.toISOString());
+      var wrap = makeEl('div');
+      wrap.appendChild(makeEl('strong', null, item.cloud || 'Sky check'));
+      wrap.appendChild(makeEl('span', null, item.signal || ''));
+      row.appendChild(when);
+      row.appendChild(wrap);
+      el.log.appendChild(row);
+    }
+  }
+
+  function clearHistory() {
+    try {
+      window.localStorage.removeItem(HISTORY_STORE);
+    } catch (err) {
+      saveHistory([]);
+    }
+    clearNode(el.log);
+    renderHistory();
+  }
+
+  function wire() {
+    el.tally = $('tally');
+    el.overlay = $('overlay');
+    el.keyInput = $('key-input');
+    el.frame = $('frame');
+    el.thumb = $('thumb');
+    el.bumperNow = $('bumper-now');
+    el.bumperOut = $('bumper-out');
+    el.nowPanel = $('now-panel');
+    el.outPanel = $('out-panel');
+    el.geoStatus = $('geo-status');
+    el.canvas = $('trend');
+    el.log = $('log');
+    el.clearLog = $('clear-log');
+    el.retry = $('retry');
+
+    $('shot').addEventListener('change', handleFileSelect);
+    $('gear').addEventListener('click', openSettings);
+    $('close-key').addEventListener('click', closeSettings);
+    $('save-key').addEventListener('click', function () {
+      var value = el.keyInput.value.trim();
+      saveKey(value);
+      closeSettings();
+      if (value && latestHourly) {
+        runOutlook(latestHourly, el.geoStatus.textContent.replace('Model data for ', ''));
+      }
+    });
+    el.overlay.addEventListener('click', function (event) {
+      if (event.target === el.overlay) { closeSettings(); }
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') { closeSettings(); }
+    });
+    el.retry.addEventListener('click', locateAndForecast);
+    el.clearLog.addEventListener('click', clearHistory);
+
+    setSkyGradient();
+    setTally(false, 'STANDBY');
+    renderHistory();
+    if (!loadKey()) { openSettings(); }
+    locateAndForecast();
+    window.setInterval(setSkyGradient, 600000);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
+
+  window.CLOUD_READER_HOME = PORTFOLIO_URL;
+}());
+</script>
+</body>
+</html>
