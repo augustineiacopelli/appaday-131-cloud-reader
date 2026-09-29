@@ -8,7 +8,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1">
+async function getModel(tier = 'sonnet') {
+  try {
+    const response = await fetch('../config.json');
+    const config = await response.json();
+    return config.models[tier];
+  } catch {
+    return 'claude-sonnet-5-5';
+  }
+}
+</script>
 <style>
 :root{
   --sky-top:#1b3a63;
@@ -922,6 +932,17 @@ footer.signoff{
 
   window.CLOUD_READER_HOME = PORTFOLIO_URL;
 }());
+
+async function getModel(tier = 'sonnet') {
+  try {
+    const response = await fetch('../config.json');
+    const config = await response.json();
+    return config.models[tier];
+  } catch {
+    return 'claude-sonnet-5-5';
+  }
+}
 </script>
 </body>
 </html>
+
