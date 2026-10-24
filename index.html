@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="manifest" href="https://augustineiacopelli.github.io/appaday/manifests/131.webmanifest">
 <script src="https://augustineiacopelli.github.io/appaday/save.js" defer></script>
+<script src="https://augustineiacopelli.github.io/appaday/keys.js" data-app="131" data-legacy-key="cloudreader-key" data-accent="#1F7A8C" defer></script>
 <title>Cloud Reader | AppADay 131</title>
 <meta name="description" content="Point your camera at the sky. Cloud Reader identifies the cloud deck overhead and calls the next few hours like a weather anchor.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -368,12 +369,9 @@ footer.signoff{
 <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
   <div class="modal">
     <h2 id="modal-title">Anthropic API key</h2>
-    <p>Cloud Reader calls Claude straight from this browser. Your key is stored only in this device's local storage and never leaves it except to reach Anthropic.</p>
-    <label for="key-input">Key</label>
-    <input type="password" id="key-input" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+    <div id="keyMount"><p>The key manager is loading. If this stays, check your connection and reload.</p></div>
     <div class="modal-row">
-      <button class="btn-solid" id="save-key" type="button">Save key</button>
-      <button class="btn-ghost" id="close-key" type="button">Close</button>
+      <button class="btn-solid" id="close-key" type="button">Close</button>
     </div>
   </div>
 </div>
@@ -383,7 +381,6 @@ footer.signoff{
   'use strict';
 
   var CLAUDE_MODEL = 'claude-sonnet-5';
-  var KEY_STORE = 'cloudreader-key';
   var HISTORY_STORE = 'cloudreader-history';
   var HISTORY_CAP = 20;
   var PORTFOLIO_URL = 'https://augustineiacopelli.github.io/appaday/';
@@ -418,25 +415,8 @@ footer.signoff{
 
   function $(id) { return document.getElementById(id); }
 
-  function loadKey() {
-    try {
-      return window.localStorage.getItem(KEY_STORE) || '';
-    } catch (err) {
-      return '';
-    }
-  }
-
-  function saveKey(value) {
-    try {
-      if (value) {
-        window.localStorage.setItem(KEY_STORE, value);
-      } else {
-        window.localStorage.removeItem(KEY_STORE);
-      }
-      return true;
-    } catch (err) {
-      return false;
-    }
+  function hasKey() {
+    return !!(window.AppKeys && window.AppKeys.has());
   }
 
   function loadHistory() {
@@ -504,8 +484,7 @@ footer.signoff{
 
   function openSettings() {
     el.overlay.classList.add('on');
-    el.keyInput.value = loadKey();
-    window.setTimeout(function () { el.keyInput.focus(); }, 30);
+    if (window.AppKeys) { window.AppKeys.mountSettings($('keyMount')); }
   }
 
   function closeSettings() {
@@ -583,10 +562,12 @@ footer.signoff{
   }
 
   async function callClaude(content, maxTokens) {
-    var key = loadKey();
+    if (!window.AppKeys) {
+      throw new Error('The key manager did not load. Check your connection and reload.');
+    }
+    var key = await window.AppKeys.get();
     if (!key) {
-      openSettings();
-      throw new Error('Add your Anthropic API key in the key panel, then shoot the sky again.');
+      throw new Error('Add your Claude API key with the KEY button, then shoot the sky again.');
     }
     var res = await fetch(API_URL, {
       method: 'POST',
@@ -837,7 +818,7 @@ footer.signoff{
       var hourly = await fetchOpenMeteo(coords.latitude, coords.longitude);
       latestHourly = hourly;
       buildTrendChart(hourly);
-      if (loadKey()) {
+      if (hasKey()) {
         await runOutlook(hourly, label);
       } else {
         renderPanel(el.outPanel, 'Outlook', 'Key needed', '', [
@@ -890,7 +871,6 @@ footer.signoff{
   function wire() {
     el.tally = $('tally');
     el.overlay = $('overlay');
-    el.keyInput = $('key-input');
     el.frame = $('frame');
     el.thumb = $('thumb');
     el.bumperNow = $('bumper-now');
@@ -906,11 +886,8 @@ footer.signoff{
     $('shot').addEventListener('change', handleFileSelect);
     $('gear').addEventListener('click', openSettings);
     $('close-key').addEventListener('click', closeSettings);
-    $('save-key').addEventListener('click', function () {
-      var value = el.keyInput.value.trim();
-      saveKey(value);
-      closeSettings();
-      if (value && latestHourly) {
+    window.addEventListener('appaday:keychange', function () {
+      if (hasKey() && latestHourly) {
         runOutlook(latestHourly, el.geoStatus.textContent.replace('Model data for ', ''));
       }
     });
@@ -926,7 +903,7 @@ footer.signoff{
     setSkyGradient();
     setTally(false, 'STANDBY');
     renderHistory();
-    if (!loadKey()) { openSettings(); }
+    if (window.AppKeys && !hasKey()) { window.AppKeys.get(); }
     locateAndForecast();
     window.setInterval(setSkyGradient, 600000);
   }
