@@ -24,7 +24,7 @@ Location is optional. Deny it and the Nowcast still works in full; the Outlook p
 
 ## Built with
 
-Vanilla HTML, CSS, and JavaScript in one self contained file, no build step. Barlow Condensed and Spectral from Google Fonts. Chart.js 4.4.1 from jsDelivr. The Anthropic Messages API with claude-sonnet-5 for both the vision read and the written outlook. Open-Meteo for the hourly forecast data, which needs no key.
+Vanilla HTML, CSS, and JavaScript in one self contained file, no build step. Barlow Condensed and Spectral from Google Fonts. Chart.js 4.4.1 from jsDelivr. The Anthropic Messages API with the current Claude Sonnet model for both the vision read and the written outlook. Open-Meteo for the hourly forecast data, which needs no key.
 
 ## Notes
 

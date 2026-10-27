@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="manifest" href="https://augustineiacopelli.github.io/appaday/manifests/131.webmanifest">
 <script src="https://augustineiacopelli.github.io/appaday/save.js" defer></script>
+<script src="https://augustineiacopelli.github.io/appaday/models.js"></script>
 <script src="https://augustineiacopelli.github.io/appaday/keys.js" data-app="131" data-legacy-key="cloudreader-key" data-accent="#1F7A8C" defer></script>
 <title>Cloud Reader | AppADay 131</title>
 <meta name="description" content="Point your camera at the sky. Cloud Reader identifies the cloud deck overhead and calls the next few hours like a weather anchor.">
@@ -17,15 +18,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1">
-async function getModel(tier = 'sonnet') {
-  try {
-    const response = await fetch('../config.json');
-    const config = await response.json();
-    return config.models[tier];
-  } catch {
-    return 'claude-sonnet-5-5';
-  }
-}
 </script>
 <style>
 :root{
@@ -380,7 +372,7 @@ footer.signoff{
 (function () {
   'use strict';
 
-  var CLAUDE_MODEL = 'claude-sonnet-5';
+  var CLAUDE_MODEL = (window.AppModels ? window.AppModels.id('sonnet') : '');
   var HISTORY_STORE = 'cloudreader-history';
   var HISTORY_CAP = 20;
   var PORTFOLIO_URL = 'https://augustineiacopelli.github.io/appaday/';
@@ -917,15 +909,6 @@ footer.signoff{
   window.CLOUD_READER_HOME = PORTFOLIO_URL;
 }());
 
-async function getModel(tier = 'sonnet') {
-  try {
-    const response = await fetch('../config.json');
-    const config = await response.json();
-    return config.models[tier];
-  } catch {
-    return 'claude-sonnet-5-5';
-  }
-}
 </script>
 </body>
 </html>
