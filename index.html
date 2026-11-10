@@ -571,7 +571,7 @@ footer.signoff{
       },
       body: JSON.stringify({
         model: CLAUDE_MODEL,
-        max_tokens: maxTokens || 700,
+        max_tokens: maxTokens || 700, thinking: (window.AppModels && window.AppModels.thinking ? window.AppModels.thinking(CLAUDE_MODEL) : undefined),
         messages: [{ role: 'user', content: content }]
       })
     });
